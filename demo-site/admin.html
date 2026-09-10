@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helio-Sol Admin</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <div class="ad-toast" id="toast"></div>
+
+  <!-- Login view -->
+  <div class="ad-login-wrap" id="loginView">
+    <form class="ad-login-card" id="loginForm">
+      <h1>Helio-Sol Admin</h1>
+      <p class="ad-sub">Log in to manage your documents.</p>
+      <label>Email</label>
+      <input type="email" id="loginEmail" required autocomplete="username">
+      <label>Password</label>
+      <input type="password" id="loginPassword" required autocomplete="current-password">
+      <button type="submit" id="loginBtn">Log In</button>
+      <p class="ad-error" id="loginError"></p>
+    </form>
+  </div>
+
+  <!-- Admin view (hidden until logged in) -->
+  <div class="ad-admin-wrap" id="adminView" style="display:none;">
+    <header class="ad-header">
+      <h1>Helio-Sol Admin</h1>
+      <button class="ad-logout" id="logoutBtn">Log Out</button>
+    </header>
+
+    <section class="ad-card">
+      <h2>Upload a Document</h2>
+      <form id="uploadForm" class="ad-upload-row">
+        <input type="file" id="fileInput" accept="application/pdf" required>
+        <button type="submit" id="uploadBtn">Upload</button>
+      </form>
+      <p class="ad-loading" id="uploadLoading" style="display:none;">Uploading and processing...</p>
+    </section>
+
+    <section class="ad-card">
+      <h2>Your Documents</h2>
+      <div id="docListWrap">
+        <p class="ad-empty" id="docEmpty" style="display:none;">No documents uploaded yet.</p>
+        <table class="ad-table" id="docTable" style="display:none;">
+          <thead>
+            <tr><th>File Name</th><th>Uploaded</th><th></th></tr>
+          </thead>
+          <tbody id="docTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    const API_BASE = "http://localhost:3001";
+    const TOKEN_KEY = "hs_admin_token";
+
+    // ---- Elements ----
+    const loginView = document.getElementById("loginView");
+    const adminView = document.getElementById("adminView");
+    const loginForm = document.getElementById("loginForm");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginError = document.getElementById("loginError");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const uploadForm = document.getElementById("uploadForm");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const uploadLoading = document.getElementById("uploadLoading");
+    const fileInput = document.getElementById("fileInput");
+
+    const docEmpty = document.getElementById("docEmpty");
+    const docTable = document.getElementById("docTable");
+    const docTableBody = document.getElementById("docTableBody");
+
+    const toast = document.getElementById("toast");
+
+    // ---- Toast ----
+    let toastTimer = null;
+    function showToast(message, kind) {
+      toast.textContent = message;
+      toast.className = "ad-toast ad-toast-" + (kind || "success") + " ad-toast-visible";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.className = "ad-toast";
+      }, 3500);
+    }
+
+    // ---- Auth state ----
+    function getToken() {
+      return localStorage.getItem(TOKEN_KEY);
+    }
+    function setToken(token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    }
+    function clearToken() {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+    function authHeaders() {
+      return { Authorization: "Bearer " + getToken() };
+    }
+
+    function showAdmin() {
+      loginView.style.display = "none";
+      adminView.style.display = "block";
+      loadDocuments();
+    }
+    function showLogin() {
+      adminView.style.display = "none";
+      loginView.style.display = "flex";
+    }
+
+    // ---- Login ----
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      loginError.textContent = "";
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Logging in...";
+
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      try {
+        const res = await fetch(API_BASE + "/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          loginError.textContent = data.error || "Login failed. Check your credentials.";
+          return;
+        }
+
+        setToken(data.token);
+        showAdmin();
+      } catch (err) {
+        loginError.textContent = "Couldn't reach the server. Is it running on localhost:3001?";
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Log In";
+      }
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      clearToken();
+      showLogin();
+    });
+
+    // ---- Upload ----
+    uploadForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      uploadBtn.disabled = true;
+      uploadLoading.style.display = "block";
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch(API_BASE + "/documents/upload", {
+          method: "POST",
+          headers: authHeaders(), // do NOT set Content-Type — browser sets multipart boundary
+          body: formData,
+        });
+        const data = await res.json();
+
+        if (res.status === 401) {
+          showToast("Session expired. Please log in again.", "error");
+          clearToken();
+          showLogin();
+          return;
+        }
+
+        if (!res.ok) {
+          showToast(data.error || "Upload failed.", "error");
+          return;
+        }
+
+        showToast("Document uploaded successfully.", "success");
+        fileInput.value = "";
+        loadDocuments();
+      } catch (err) {
+        showToast("Couldn't reach the server during upload.", "error");
+      } finally {
+        uploadBtn.disabled = false;
+        uploadLoading.style.display = "none";
+      }
+    });
+
+    // ---- List documents ----
+    async function loadDocuments() {
+      try {
+        const res = await fetch(API_BASE + "/documents", {
+          headers: authHeaders(),
+        });
+
+        if (res.status === 401) {
+          clearToken();
+          showLogin();
+          return;
+        }
+
+        const data = await res.json();
+        renderDocuments(Array.isArray(data) ? data : data.documents || []);
+      } catch (err) {
+        showToast("Couldn't load documents.", "error");
+      }
+    }
+
+    function renderDocuments(docs) {
+      docTableBody.innerHTML = "";
+
+      if (!docs.length) {
+        docEmpty.style.display = "block";
+        docTable.style.display = "none";
+        return;
+      }
+
+      docEmpty.style.display = "none";
+      docTable.style.display = "table";
+
+      docs.forEach((doc) => {
+        const tr = document.createElement("tr");
+
+        const nameTd = document.createElement("td");
+        nameTd.textContent = doc.file_name || doc.fileName || "Untitled";
+
+        const dateTd = document.createElement("td");
+        const uploadedAt = doc.uploaded_at || doc.uploadedAt;
+        dateTd.textContent = uploadedAt ? new Date(uploadedAt).toLocaleDateString() : "—";
+
+        const actionTd = document.createElement("td");
+        const delBtn = document.createElement("button");
+        delBtn.className = "ad-delete-btn";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", () => deleteDocument(doc.id, delBtn));
+        actionTd.appendChild(delBtn);
+
+        tr.appendChild(nameTd);
+        tr.appendChild(dateTd);
+        tr.appendChild(actionTd);
+        docTableBody.appendChild(tr);
+      });
+    }
+
+    // ---- Delete ----
+    async function deleteDocument(id, btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = "Deleting...";
+
+      try {
+        const res = await fetch(API_BASE + "/documents/" + id, {
+          method: "DELETE",
+          headers: authHeaders(),
+        });
+
+        if (res.status === 401) {
+          showToast("Session expired. Please log in again.", "error");
+          clearToken();
+          showLogin();
+          return;
+        }
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(data.error || "Delete failed.", "error");
+          btnEl.disabled = false;
+          btnEl.textContent = "Delete";
+          return;
+        }
+
+        showToast("Document deleted.", "success");
+        loadDocuments();
+      } catch (err) {
+        showToast("Couldn't reach the server during delete.", "error");
+        btnEl.disabled = false;
+        btnEl.textContent = "Delete";
+      }
+    }
+
+    // ---- Init ----
+    if (getToken()) {
+      showAdmin();
+    } else {
+      showLogin();
+    }
+  })();
+  </script>
+
+</body>
+</html>

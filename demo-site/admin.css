@@ -1,0 +1,86 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: #f7fafc;
+  color: #1a202c;
+}
+
+/* Login view */
+.ad-login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ad-login-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 340px;
+}
+.ad-login-card h1 { font-size: 20px; margin-bottom: 4px; }
+.ad-sub { font-size: 13px; color: #718096; margin-bottom: 20px; }
+.ad-login-card label {
+  display: block; font-size: 12px; font-weight: 600; color: #4a5568;
+  margin-bottom: 4px; margin-top: 12px;
+}
+.ad-login-card input {
+  width: 100%; padding: 9px 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px;
+}
+.ad-login-card button {
+  width: 100%; margin-top: 20px; background: #2b6cb0; color: #fff; border: none;
+  border-radius: 6px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.ad-login-card button:disabled { opacity: 0.6; cursor: not-allowed; }
+.ad-error { color: #c53030; font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+/* Admin view */
+.ad-admin-wrap { max-width: 700px; margin: 0 auto; padding: 30px 20px; }
+.ad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.ad-header h1 { font-size: 20px; }
+.ad-logout {
+  background: none; border: 1px solid #cbd5e0; border-radius: 6px; padding: 7px 14px;
+  font-size: 13px; cursor: pointer; color: #4a5568;
+}
+
+.ad-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 20px;
+}
+.ad-card h2 { font-size: 15px; margin-bottom: 14px; color: #2d3748; }
+
+.ad-upload-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ad-upload-row input[type="file"] { flex: 1; font-size: 13px; }
+.ad-upload-row button {
+  background: #2b6cb0; color: #fff; border: none; border-radius: 6px; padding: 9px 16px;
+  font-size: 13px; cursor: pointer;
+}
+.ad-upload-row button:disabled { opacity: 0.6; cursor: not-allowed; }
+.ad-loading { font-size: 12.5px; color: #718096; margin-top: 10px; }
+
+.ad-empty { font-size: 13px; color: #a0aec0; }
+.ad-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ad-table th {
+  text-align: left; font-size: 11px; text-transform: uppercase; color: #a0aec0;
+  padding: 6px 8px; border-bottom: 1px solid #e2e8f0;
+}
+.ad-table td { padding: 10px 8px; border-bottom: 1px solid #f0f2f5; }
+.ad-delete-btn {
+  background: none; border: 1px solid #fc8181; color: #c53030; border-radius: 6px;
+  padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+.ad-delete-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Toast */
+.ad-toast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-20px);
+  padding: 10px 18px; border-radius: 8px; font-size: 13.5px; color: #fff;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+  z-index: 9999;
+}
+.ad-toast-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.ad-toast-success { background: #2f855a; }
+.ad-toast-error { background: #c53030; }
