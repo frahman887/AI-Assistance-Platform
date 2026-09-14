@@ -1,0 +1,18 @@
+-- Run this ONLY after confirming 004's backfill left zero NULL business_id
+-- rows in documents, embeddings, ai_logs, and leads. This is intentionally a
+-- separate migration so the backfill and the enforcement aren't one
+-- irreversible step.
+
+ALTER TABLE documents ALTER COLUMN business_id SET NOT NULL;
+ALTER TABLE embeddings ALTER COLUMN business_id SET NOT NULL;
+ALTER TABLE ai_logs ALTER COLUMN business_id SET NOT NULL;
+ALTER TABLE leads ALTER COLUMN business_id SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_documents_business_id ON documents(business_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_business_id ON embeddings(business_id);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_business_id ON ai_logs(business_id);
+CREATE INDEX IF NOT EXISTS idx_leads_business_id ON leads(business_id);
+
+-- users.business_slug is now legacy (slug lives on businesses instead).
+-- Not dropping it yet — leave it inert until you've confirmed nothing in
+-- deployed code still reads it, then drop it in a follow-up migration.

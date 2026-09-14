@@ -1,0 +1,45 @@
+-- Introduces `businesses` as a first-class entity, decoupled from `users`.
+-- Previously one user account WAS a business (business_slug lived on users).
+-- Now a business can have multiple staff logins (owner, staff, ...), so
+-- tenancy has to be tracked through a join table instead of assumed 1:1.
+
+CREATE TABLE IF NOT EXISTS businesses (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(100) UNIQUE NOT NULL,
+  name VARCHAR(200) NOT NULL,
+  vertical VARCHAR(100),
+  settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS business_users (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- 'owner' | 'staff' for now. Deliberately not a bigger permissions system
+  -- yet — expand only when a real second role is needed.
+  role VARCHAR(50) NOT NULL DEFAULT 'staff',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (business_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_business_users_user_id ON business_users(user_id);
+CREATE INDEX IF NOT EXISTS idx_business_users_business_id ON business_users(business_id);
+
+-- Backfill: every user who currently has a business_slug becomes the sole
+-- owner of a new business with that slug. This assumes today's reality
+-- (one user == one business) and is safe only because that's still true
+-- at the moment this migration runs.
+INSERT INTO businesses (slug, name)
+SELECT business_slug, business_slug
+FROM users
+WHERE business_slug IS NOT NULL
+ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO business_users (business_id, user_id, role)
+SELECT b.id, u.id, 'owner'
+FROM users u
+JOIN businesses b ON b.slug = u.business_slug
+WHERE u.business_slug IS NOT NULL
+ON CONFLICT (business_id, user_id) DO NOTHING;

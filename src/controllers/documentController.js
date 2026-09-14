@@ -8,23 +8,23 @@ export async function uploadDocument(req, res) {
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const userId = req.user.userId;
+    const { userId, businessId } = req.user;
     const { originalname, buffer } = req.file;
 
-    const { blobName, url } = await uploadBlob(buffer, originalname, userId);
+    const { blobName, url } = await uploadBlob(buffer, originalname, businessId);
 
     const result = await db.query(
-      `INSERT INTO documents (user_id, file_name, blob_url, uploaded_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO documents (user_id, business_id, file_name, blob_url, uploaded_at)
+       VALUES ($1, $2, $3, $4, NOW())
        RETURNING id, file_name, blob_url, uploaded_at`,
-      [userId, originalname, url]
+      [userId, businessId, originalname, url]
     );
 
     const document = result.rows[0];
 
     let processingResult;
     try {
-      processingResult = await processDocument(document.id, userId, buffer);
+      processingResult = await processDocument(document.id, businessId, userId, buffer);
     } catch (procErr) {
       console.error("Processing failed for document", document.id, procErr);
       return res.status(201).json({
@@ -47,13 +47,13 @@ export async function uploadDocument(req, res) {
 
 export async function listDocuments(req, res) {
   try {
-    const userId = req.user.userId;
+    const { businessId } = req.user;
     const result = await db.query(
       `SELECT id, file_name, blob_url, uploaded_at
        FROM documents
-       WHERE user_id = $1
+       WHERE business_id = $1
        ORDER BY uploaded_at DESC`,
-      [userId]
+      [businessId]
     );
     res.json({ documents: result.rows });
   } catch (err) {
@@ -64,7 +64,7 @@ export async function listDocuments(req, res) {
 
 export async function deleteDocument(req, res) {
   try {
-    const userId = req.user.userId;
+    const { businessId } = req.user;
     const documentId = parseInt(req.params.id, 10);
 
     if (isNaN(documentId)) {
@@ -72,8 +72,8 @@ export async function deleteDocument(req, res) {
     }
 
     const findResult = await db.query(
-      `SELECT id, blob_url FROM documents WHERE id = $1 AND user_id = $2`,
-      [documentId, userId]
+      `SELECT id, blob_url FROM documents WHERE id = $1 AND business_id = $2`,
+      [documentId, businessId]
     );
 
     if (findResult.rows.length === 0) {

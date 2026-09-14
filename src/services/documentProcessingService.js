@@ -6,7 +6,7 @@ import { generateEmbeddings } from "./embeddingService.js";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
-export async function processDocument(documentId, userId, pdfBuffer) {
+export async function processDocument(documentId, businessId, userId, pdfBuffer) {
   const pdfData = await pdfParse(pdfBuffer);
   const rawText = pdfData.text;
 
@@ -24,9 +24,9 @@ export async function processDocument(documentId, userId, pdfBuffer) {
 
   const insertPromises = chunks.map((content, i) => {
     return db.query(
-      `INSERT INTO embeddings (document_id, user_id, content, embedding)
-       VALUES ($1, $2, $3, $4::vector)`,
-      [documentId, userId, content, `[${embeddings[i].join(",")}]`]
+      `INSERT INTO embeddings (document_id, business_id, user_id, content, embedding)
+       VALUES ($1, $2, $3, $4, $5::vector)`,
+      [documentId, businessId, userId, content, `[${embeddings[i].join(",")}]`]
     );
   });
 

@@ -1,0 +1,50 @@
+-- Adds business_id to every table that was using user_id as a stand-in for
+-- tenant identity. business_id is now the real tenant key. user_id stays on
+-- these tables too — it now records *which staff member* did the thing,
+-- which only matters/exists because a business can have multiple users.
+--
+-- Also backfills the ai_logs table definition itself: no prior migration
+-- file created it, even though the app writes to it. Adding it here so the
+-- migration history can actually rebuild the schema from scratch.
+
+CREATE TABLE IF NOT EXISTS ai_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  question TEXT NOT NULL,
+  retrieved_chunk_ids INTEGER[],
+  response TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS business_id INTEGER REFERENCES businesses(id);
+ALTER TABLE embeddings ADD COLUMN IF NOT EXISTS business_id INTEGER REFERENCES businesses(id);
+ALTER TABLE ai_logs ADD COLUMN IF NOT EXISTS business_id INTEGER REFERENCES businesses(id);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS business_id INTEGER REFERENCES businesses(id);
+
+-- leads.user_id was NOT NULL under the old model, where it actually held the
+-- owning business's user id (not an actor). Going forward, leads come from
+-- anonymous widget visitors — there's no logged-in user to attribute them
+-- to — so this can no longer be required.
+ALTER TABLE leads ALTER COLUMN user_id DROP NOT NULL;
+
+-- Backfill from the existing user_id -> business_users mapping. Safe only
+-- while it's still true that each user belongs to exactly one business —
+-- if that stops being true before this runs, this backfill needs revisiting
+-- (a user with 2 businesses would backfill nondeterministically here).
+UPDATE documents d SET business_id = bu.business_id
+FROM business_users bu WHERE bu.user_id = d.user_id AND d.business_id IS NULL;
+
+UPDATE embeddings e SET business_id = bu.business_id
+FROM business_users bu WHERE bu.user_id = e.user_id AND e.business_id IS NULL;
+
+UPDATE ai_logs a SET business_id = bu.business_id
+FROM business_users bu WHERE bu.user_id = a.user_id AND a.business_id IS NULL;
+
+UPDATE leads l SET business_id = bu.business_id
+FROM business_users bu WHERE bu.user_id = l.user_id AND l.business_id IS NULL;
+
+-- Do NOT set NOT NULL or index here yet. Run this migration, verify counts
+-- match (see verify.mjs or a manual SELECT COUNT(*) WHERE business_id IS NULL
+-- on each table), THEN run 005 to lock it down. Flipping straight to NOT NULL
+-- in the same migration is how you find out about an edge case in production
+-- instead of in a dry run.

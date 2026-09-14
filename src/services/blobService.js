@@ -9,10 +9,10 @@ const containerClient = blobServiceClient.getContainerClient(
   process.env.AZURE_STORAGE_CONTAINER
 );
 
-export async function uploadBlob(buffer, originalName, userId) {
+export async function uploadBlob(buffer, originalName, businessId) {
   const timestamp = Date.now();
   const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
-  const blobName = `user-${userId}/${timestamp}-${safeName}`;
+  const blobName = `business-${businessId}/${timestamp}-${safeName}`;
 
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   await blockBlobClient.uploadData(buffer, {

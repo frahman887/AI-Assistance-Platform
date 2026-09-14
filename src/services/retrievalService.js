@@ -9,7 +9,7 @@ export async function retrieveRelevantChunks(questionEmbedding, businessId, topN
   const { rows } = await pool.query(
     `SELECT id, document_id, content, embedding <=> $1 AS distance
      FROM embeddings
-     WHERE user_id = $2
+     WHERE business_id = $2
      ORDER BY embedding <=> $1
      LIMIT $3`,
     [embeddingLiteral, businessId, topN]
