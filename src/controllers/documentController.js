@@ -83,11 +83,27 @@ export async function deleteDocument(req, res) {
     const doc = findResult.rows[0];
     const blobName = doc.blob_url.split("/documents/")[1];
 
+    // Embeddings and the document row are deleted together in one
+    // transaction, then the blob is removed last. If the blob delete fails
+    // after this commits, the result is a harmless orphaned file sitting in
+    // storage — not a document that "looks deleted" but still has queryable
+    // chunks feeding answers in /ask. That's the safer failure direction.
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM embeddings WHERE document_id = $1`, [documentId]);
+      await client.query(`DELETE FROM documents WHERE id = $1`, [documentId]);
+      await client.query("COMMIT");
+    } catch (txErr) {
+      await client.query("ROLLBACK");
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
     if (blobName) {
       await deleteBlob(blobName);
     }
-
-    await db.query(`DELETE FROM documents WHERE id = $1`, [documentId]);
 
     res.json({ deleted: true, id: documentId });
   } catch (err) {

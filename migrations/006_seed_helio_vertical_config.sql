@@ -30,4 +30,4 @@ SET
     '6. Do not mention "the context," "the document," or that you are an AI retrieving information — ' ||
     'just answer naturally, the way a knowledgeable staff member would.'
   )
-WHERE slug = 'REPLACE_WITH_HELIOS_ACTUAL_SLUG';
+WHERE slug = 'helio-solar';
